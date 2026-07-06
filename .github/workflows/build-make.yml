@@ -1,0 +1,36 @@
+name: Build Ultimate Make PR22836
+on: [push, workflow_dispatch]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 1. Clone Llama.cpp
+        run: git clone https://github.com/ggml-org/llama.cpp.git .
+
+      - name: 2. Time Travel to PR 22836
+        run: |
+          git fetch origin pull/22836/head:pr22836
+          git checkout pr22836
+
+      - name: 3. Download Invincible Compiler
+        run: |
+          curl -L -o w64devkit.zip https://github.com/skeeto/w64devkit/releases/download/v1.21.0/w64devkit-1.21.0-win32.zip
+          7z x w64devkit.zip -oW64_ENV
+
+      - name: 4. Build with Pure Make (Force Disable AVX2)
+        run: |
+          $env:PATH=".\W64_ENV\w64devkit\bin;$env:PATH"
+          make.exe -j8 llama-server LLAMA_AVX=1 LLAMA_AVX2=0 LLAMA_FMA=0 LLAMA_F16C=1
+
+      - name: 5. Pack Engine
+        run: |
+          mkdir W530_Final
+          copy llama-server.exe W530_Final\
+          copy *.dll W530_Final\ 2>nul || echo "Make build usually has no DLLs, which is perfect."
+
+      - name: 6. Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Llama-Server-Make-W530
+          path: W530_Final\*
