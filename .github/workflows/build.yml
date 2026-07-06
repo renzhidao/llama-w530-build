@@ -1,0 +1,22 @@
+name: Build W530 Engine
+on: [push, workflow_dispatch]
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Clone
+        run: git clone https://github.com/ggml-org/llama.cpp.git .
+      - name: Configure
+        run: cmake -B build -DGGML_AVX=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_AVX512=OFF
+      - name: Build
+        run: cmake --build build --config Release --target llama-server -j 8
+      - name: Pack
+        run: |
+          mkdir W530_Engine
+          copy build\bin\Release\llama-server.exe W530_Engine\
+          copy build\bin\Release\*.dll W530_Engine\
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Llama-Server-W530-Engine
+          path: W530_Engine\*
