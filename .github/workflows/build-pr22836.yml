@@ -1,0 +1,33 @@
+name: Build TimeTravel PR22836
+on: [push, workflow_dispatch]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 1. Clone Llama.cpp
+        run: git clone https://github.com/ggml-org/llama.cpp.git .
+
+      - name: 2. Time Travel to PR 22836 (The STQ Kernel)
+        run: |
+          echo "🕰️ 正在强行剥离主线，跃迁至 PR 22836 时间线..."
+          git fetch origin pull/22836/head:pr22836
+          git checkout pr22836
+
+      - name: 3. Configure (No-AVX2 / W530 专属)
+        run: cmake -B build -DGGML_AVX=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_AVX512=OFF
+
+      - name: 4. Build Release
+        run: cmake --build build --config Release --target llama-server -j 8
+
+      - name: 5. Pack Engine
+        run: |
+          mkdir W530_Final
+          copy build\bin\Release\llama-server.exe W530_Final\
+          copy build\bin\Release\*.dll W530_Final\
+
+      - name: 6. Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Llama-Server-HyMT-W530-PR22836
+          path: W530_Final\*
