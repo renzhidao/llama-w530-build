@@ -1,0 +1,50 @@
+name: Build Ultimate W530 Hy-MT Engine
+on: [push, workflow_dispatch]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 1. Clone Llama.cpp Official
+        run: git clone https://github.com/ggml-org/llama.cpp.git .
+
+      - name: 2. Force Apply Tencent Hy-MT (Type 42) Patch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 正在强行全网搜索腾讯的混元底层补丁(STQ / AngelSlim)..."
+          # 模糊查找 PR 并强行拉取
+          PR_NUM=$(gh pr list --search "STQ in:title,body" --state all --json number --jq '.[0].number')
+          if [ "$PR_NUM" != "null" ] && [ ! -z "$PR_NUM" ]; then
+            echo "✅ 找到 STQ 补丁 PR $PR_NUM，强行注入！"
+            gh pr checkout $PR_NUM
+          else
+            PR_NUM2=$(gh pr list --search "type 42 in:title,body" --state all --json number --jq '.[0].number')
+            if [ "$PR_NUM2" != "null" ] && [ ! -z "$PR_NUM2" ]; then
+              echo "✅ 找到 Type 42 补丁 PR $PR_NUM2，强行注入！"
+              gh pr checkout $PR_NUM2
+            else
+              echo "⚠️ 官方库未找到，强行挂载国内镜像站上的第三方开源混元适配分支..."
+              git remote add tencent https://github.com/Tencent-Hunyuan/llama.cpp.git || true
+              git fetch tencent || true
+              git merge tencent/master --allow-unrelated-histories || true
+            fi
+          fi
+
+      - name: 3. Configure (No-AVX2 / W530 专属)
+        run: cmake -B build -DGGML_AVX=ON -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_AVX512=OFF
+
+      - name: 4. Build Release
+        run: cmake --build build --config Release --target llama-server -j 8
+
+      - name: 5. Pack Engine
+        run: |
+          mkdir W530_Ultimate
+          copy build\bin\Release\llama-server.exe W530_Ultimate\
+          copy build\bin\Release\*.dll W530_Ultimate\
+
+      - name: 6. Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Llama-Server-Ultimate-W530
+          path: W530_Ultimate\*
